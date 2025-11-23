@@ -114,8 +114,17 @@ function loadPreviewData() {
 // Load dữ liệu từ file TXT
 async function loadData() {
     try {
-        const response = await fetch(DATA_FILE_PATH + '?t=' + new Date().getTime());
+        // Sử dụng relative path cho Project Site
+        const dataUrl = IS_PROJECT_SITE ? `/${GITHUB_REPO}/${DATA_FILE_PATH}` : `/${DATA_FILE_PATH}`;
+        const response = await fetch(dataUrl + '?t=' + new Date().getTime());
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
         const text = await response.text();
+        // ... phần còn lại giữ nguyên
+
         
         data = text.split('\n')
             .filter(line => line.trim() !== '')
