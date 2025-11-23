@@ -1,6 +1,6 @@
 // Cấu hình GitHub - CẦN SỬA LẠI THEO THÔNG TIN THỰC TẾ
 const GITHUB_USERNAME = 'qiu2zhi1zhe3'; // THAY BẰNG USERNAME THẬT
-const GITHUB_REPO = 'qiu2zhi1zhe3.github.io'; // THAY BẰNG TÊN REPOSITORY THẬT
+const GITHUB_REPO = 'bs'; // THAY BẰNG TÊN REPOSITORY THẬT
 const DATA_FILE_PATH = 'data.txt';
 
 let data = [];
