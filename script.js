@@ -1,47 +1,17 @@
-// Cấu hình GitHub - ĐÃ SỬA CHO PROJECT SITE 'bs'
-const GITHUB_USERNAME = 'qiu2zhi1zhe3'; // THAY BẰNG USERNAME THẬT
-const GITHUB_REPO = 'bs'; // <-- ĐÃ SỬA THÀNH TÊN REPOSITORY 'bs'
-const DATA_FILE_PATH = 'data.txt'; // Tên file dữ liệu
+// Cấu hình GitHub cho project site "bs"
+const GITHUB_USERNAME = 'qiu2zhi1zhe3';
+const GITHUB_REPO = 'bs';
+const DATA_FILE_PATH = 'data.txt';
 
 let data = [];
 let githubToken = localStorage.getItem('githubToken');
 
-// Hàm tự động detect thông tin repository (dự phòng)
-function detectRepoInfo() {
-    // Lấy từ URL hiện tại
-    const currentUrl = window.location.href;
-    const match = currentUrl.match(/https?:\/\/([^.]+)\.github\.io\/([^/]+)/);
-    
-    if (match && match[1] && match[2]) {
-        return {
-            username: match[1],
-            repo: match[2]
-        };
-    }
-    
-    // Fallback: lấy từ hostname
-    const hostname = window.location.hostname;
-    const username = hostname.split('.')[0];
-    
-    // Trường hợp này không cần thiết khi GITHUB_REPO đã được đặt cứng
-    return {
-        username: username,
-        repo: GITHUB_REPO // Sẽ dùng giá trị 'bs' đã đặt
-    };
+// Hàm lấy base URL cho project site
+function getBaseUrl() {
+    return `https://${GITHUB_USERNAME}.github.io/${GITHUB_REPO}`;
 }
 
-const repoInfo = detectRepoInfo();
-// Sử dụng giá trị đặt cứng (đã sửa) cho chính xác
-const ACTUAL_USERNAME = GITHUB_USERNAME; 
-const ACTUAL_REPO = GITHUB_REPO; 
-
-console.log('GitHub Config:', {
-    username: ACTUAL_USERNAME,
-    repo: ACTUAL_REPO,
-    token: githubToken ? '✓ Đã có token' : '✗ Chưa có token'
-});
-
-// Hàm Tab
+// Tab functions
 function openTab(tabName) {
     // Ẩn tất cả tab content
     const tabContents = document.getElementsByClassName('tab-content');
@@ -55,16 +25,23 @@ function openTab(tabName) {
         tabButtons[i].classList.remove('active');
     }
     
-    // Hiển thị tab được chọn
-    document.getElementById(tabName).classList.add('active');
-    // Kiểm tra xem event.currentTarget có tồn tại không trước khi truy cập classList
-    if (event && event.currentTarget) {
-        event.currentTarget.classList.add('active');
+    // Hiển thị tab được chọn và active button
+    const selectedTab = document.getElementById(tabName);
+    if (selectedTab) {
+        selectedTab.classList.add('active');
+    }
+    
+    // Active button tương ứng
+    const buttons = document.getElementsByClassName('tab-button');
+    for (let button of buttons) {
+        if (button.textContent.includes(tabName === 'searchTab' ? 'Tìm kiếm' : 'Thêm dữ liệu')) {
+            button.classList.add('active');
+        }
     }
     
     // Nếu là tab thêm dữ liệu, load preview
     if (tabName === 'addTab') {
-        loadPreviewData();
+        setTimeout(loadPreviewData, 100);
     }
 }
 
@@ -73,14 +50,8 @@ function loadPreviewData() {
     const previewContent = document.getElementById('dataPreview');
     previewContent.innerHTML = 'Đang tải dữ liệu...';
     
-    // Sử dụng đường dẫn tương đối đơn giản
-    fetch(DATA_FILE_PATH + '?t=' + new Date().getTime())
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            return response.text();
-        })
+    fetch('data.txt' + '?t=' + new Date().getTime())
+        .then(response => response.text())
         .then(text => {
             const lines = text.split('\n').filter(line => line.trim() !== '');
             if (lines.length === 0) {
@@ -90,38 +61,28 @@ function loadPreviewData() {
             }
         })
         .catch(error => {
-            console.error('Lỗi khi tải dữ liệu Preview:', error);
             previewContent.innerHTML = 'Lỗi khi tải dữ liệu: ' + error.message;
         });
 }
 
 // Load dữ liệu từ file TXT
 async function loadData() {
-    console.log('--- BẮT ĐẦU TẢI DỮ LIỆU ---'); // Thêm debug log
     try {
-        // Sử dụng đường dẫn tương đối đơn giản
-        const response = await fetch(DATA_FILE_PATH + '?t=' + new Date().getTime());
-        
-        if (!response.ok) {
-             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
+        const response = await fetch('data.txt' + '?t=' + new Date().getTime());
         const text = await response.text();
         
         data = text.split('\n')
             .filter(line => line.trim() !== '')
             .map(line => {
                 const parts = line.split('.');
-                // Thay đổi logic: Kiểm tra >= 2 phần để xử lý cả A.B và A.B.C
-                if (parts.length >= 2) {
+                if (parts.length >= 3) {
                     return {
                         fullText: line.trim(),
                         ch: parts[0], // CH
-                        bs: parts[1].split(' ').map(bs => bs.trim()).filter(bs => bs !== ''), // BS
-                        more: parts.length >= 3 ? parts.slice(2).join('.') : '' // More (Nếu không có thì là rỗng)
+                        bs: parts[1].split(' ').map(bs => bs.trim()).filter(bs => bs !== ''), // BS (cách nhau bằng dấu cách)
+                        more: parts.slice(2).join('.') // More
                     };
                 }
-                // Trường hợp chỉ có 1 phần hoặc không có dấu chấm
                 return {
                     fullText: line.trim(),
                     ch: '',
@@ -131,14 +92,9 @@ async function loadData() {
             });
         
         console.log('Đã load', data.length, 'dòng dữ liệu');
-        // Nếu đã có từ khóa trong ô tìm kiếm, tự động tìm kiếm lại
-        if (document.getElementById('searchInput').value.trim() !== '') {
-            searchData();
-        }
-
     } catch (error) {
         console.error('Lỗi khi load dữ liệu:', error);
-        showMessage('Lỗi khi tải dữ liệu: ' + error.message + '. Kiểm tra data.txt trong Network tab.', 'error');
+        showMessage('Lỗi khi tải dữ liệu: ' + error.message, 'error');
     }
 }
 
@@ -255,7 +211,7 @@ async function addNewData() {
             const existingLine = lines[existingLineIndex];
             const parts = existingLine.split('.');
             const existingBS = parts[1].split(' ').map(bs => bs.trim()).filter(bs => bs !== '');
-            const existingMore = parts.length >= 3 ? parts.slice(2).join('.') : '';
+            const existingMore = parts.slice(2).join('.');
             
             // Gộp BS (loại bỏ trùng lặp)
             const mergedBS = [...new Set([...existingBS, ...bsArray])];
@@ -263,12 +219,10 @@ async function addNewData() {
             // Gộp More (nếu có)
             let mergedMore = existingMore;
             if (more && !existingMore.includes(more)) {
-                // Thêm khoảng trắng nếu existingMore không rỗng
                 mergedMore = existingMore ? `${existingMore} ${more}` : more;
             }
             
-            // Xây dựng lại entry, chỉ thêm dấu chấm cho More nếu nó có nội dung
-            newEntry = `${ch}.${mergedBS.join(' ')}${mergedMore ? '.' + mergedMore : ''}`;
+            newEntry = more ? `${ch}.${mergedBS.join(' ')}.${mergedMore}` : `${ch}.${mergedBS.join(' ')}`;
             lines[existingLineIndex] = newEntry;
             
         } else {
@@ -282,8 +236,7 @@ async function addNewData() {
             lines = lines.filter((line, index) => !linesToRemove.includes(index));
         }
         
-        // Đảm bảo nội dung kết thúc bằng ký tự xuống dòng
-        const newContent = lines.join('\n') + '\n'; 
+        const newContent = lines.join('\n');
         
         // Cập nhật file
         await updateFile(newContent, fileInfo.sha);
@@ -317,24 +270,16 @@ async function getFileInfo() {
         throw new Error('Chưa có GitHub Token. Vui lòng cung cấp token.');
     }
 
-    console.log('Đang lấy thông tin file từ GitHub...', {
-        username: ACTUAL_USERNAME,
-        repo: ACTUAL_REPO,
-        path: DATA_FILE_PATH
-    });
-
     const response = await fetch(
-        `https://api.github.com/repos/${ACTUAL_USERNAME}/${ACTUAL_REPO}/contents/${DATA_FILE_PATH}`,
+        `https://api.github.com/repos/${GITHUB_USERNAME}/${GITHUB_REPO}/contents/${DATA_FILE_PATH}`,
         {
             headers: {
                 'Authorization': `token ${githubToken}`,
                 'Accept': 'application/vnd.github.v3+json',
-                'User-Agent': 'GitHub-Data-Manager'
+                'User-Agent': 'BS-Data-Manager'
             }
         }
     );
-
-    console.log('GitHub API Response:', response.status, response.statusText);
 
     if (!response.ok) {
         if (response.status === 404) {
@@ -345,14 +290,8 @@ async function getFileInfo() {
         } else if (response.status === 403) {
             throw new Error('Token không đủ quyền hoặc bị giới hạn rate limit.');
         } else {
-            // Thử đọc chi tiết lỗi từ response
-            try {
-                const errorData = await response.json();
-                throw new Error(`Lỗi GitHub API: ${response.status} - ${errorData.message || response.statusText}`);
-            } catch (e) {
-                const errorData = await response.text();
-                throw new Error(`Lỗi GitHub API: ${response.status} - ${errorData}`);
-            }
+            const errorData = await response.text();
+            throw new Error(`Lỗi GitHub API: ${response.status} - ${errorData}`);
         }
     }
 
@@ -365,13 +304,8 @@ async function getFileInfo() {
 
 // Hàm tạo file mới nếu chưa tồn tại
 async function createNewFile() {
-    console.log('File data.txt chưa tồn tại, đang tạo file mới...');
-    
-    // Nội dung khởi tạo file
-    const initialContent = '# Dữ liệu bắt đầu\nC11708.38A-40773 38A-11106.Nguyễn Quang Thọ\n';
-    
     const response = await fetch(
-        `https://api.github.com/repos/${ACTUAL_USERNAME}/${ACTUAL_REPO}/contents/${DATA_FILE_PATH}`,
+        `https://api.github.com/repos/${GITHUB_USERNAME}/${GITHUB_REPO}/contents/${DATA_FILE_PATH}`,
         {
             method: 'PUT',
             headers: {
@@ -381,7 +315,7 @@ async function createNewFile() {
             },
             body: JSON.stringify({
                 message: 'Tạo file data.txt mới',
-                content: encodeBase64(initialContent)
+                content: encodeBase64('# Dữ liệu bắt đầu\nC11708.38A-40773 38A-11106.Nguyễn Quang Thọ')
             })
         }
     );
@@ -391,9 +325,8 @@ async function createNewFile() {
         throw new Error(`Không thể tạo file mới: ${errorData.message}`);
     }
 
-    // Trả về thông tin file mới tạo
     return {
-        content: initialContent,
+        content: '# Dữ liệu bắt đầu\nC11708.38A-40773 38A-11106.Nguyễn Quang Thọ',
         sha: (await response.json()).content.sha
     };
 }
@@ -401,7 +334,7 @@ async function createNewFile() {
 // Hàm cập nhật file
 async function updateFile(content, sha) {
     const response = await fetch(
-        `https://api.github.com/repos/${ACTUAL_USERNAME}/${ACTUAL_REPO}/contents/${DATA_FILE_PATH}`,
+        `https://api.github.com/repos/${GITHUB_USERNAME}/${GITHUB_REPO}/contents/${DATA_FILE_PATH}`,
         {
             method: 'PUT',
             headers: {
@@ -477,9 +410,6 @@ function showMessage(message, type) {
     messageEl.textContent = message;
     messageEl.className = `message ${type}`;
     
-    // Hiển thị message
-    messageEl.style.display = 'block';
-    
     setTimeout(() => {
         messageEl.style.display = 'none';
     }, 5000);
@@ -493,7 +423,6 @@ function clearForm() {
 
 function refreshData() {
     loadData();
-    showMessage('Đang làm mới dữ liệu...', 'success');
 }
 
 // Event listeners
@@ -518,27 +447,8 @@ document.getElementById('newSubCode').addEventListener('input', function(e) {
     this.value = this.value.toUpperCase();
 });
 
-// Hàm debug để kiểm tra cấu hình
-function debugConfig() {
-    console.log('=== DEBUG CONFIG ===');
-    console.log('Username:', ACTUAL_USERNAME);
-    console.log('Repo:', ACTUAL_REPO);
-    console.log('Token exists:', !!githubToken);
-    console.log('Current URL:', window.location.href);
-    console.log('Data file URL (Fetch target):', `${window.location.origin}${window.location.pathname.endsWith('/') ? '' : '/'}data.txt`);
-    console.log('GitHub API URL:', `https://api.github.com/repos/${ACTUAL_USERNAME}/${ACTUAL_REPO}/contents/${DATA_FILE_PATH}`);
-    console.log('==================');
-}
-
 // Load dữ liệu khi trang được tải
 window.addEventListener('DOMContentLoaded', function() {
     loadData();
-    // Mặc định mở tab tìm kiếm (Cần đảm bảo phần tử 'searchTab' tồn tại trong HTML)
-    const searchTabButton = document.querySelector('.tab-button[onclick*="searchTab"]');
-    if (searchTabButton) {
-        searchTabButton.click(); // Kích hoạt tab search
-    } else {
-        openTab('searchTab');
-    }
-    debugConfig();
+    openTab('searchTab');
 });
