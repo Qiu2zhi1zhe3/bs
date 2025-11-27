@@ -144,7 +144,7 @@ function searchData() {
     }
 }
 
-// Hàm thêm dữ liệu mới với logic gộp CH và xóa BS trùng
+// Hàm thêm dữ liệu mới - Phiên bản đơn giản
 async function addNewData() {
     let ch = document.getElementById('newCode').value.trim().toUpperCase();
     let bsInput = document.getElementById('newSubCode').value.trim().toUpperCase();
@@ -160,7 +160,6 @@ async function addNewData() {
         return;
     }
 
-    // Xử lý nhiều BS (tách bằng dấu CÁCH)
     const bsArray = bsInput.split(' ')
         .map(bs => bs.trim())
         .filter(bs => bs !== '');
@@ -173,96 +172,76 @@ async function addNewData() {
     try {
         showMessage('Đang xử lý dữ liệu...', 'success');
         
-        // Lấy thông tin file hiện tại
         const fileInfo = await getFileInfo();
-        let currentContent = fileInfo.content;
-        let lines = currentContent.split('\n').filter(line => line.trim() !== '');
+        let lines = fileInfo.content.split('\n').filter(line => line.trim() !== '');
         
-        // Tìm các dòng cần xử lý
-        let existingLineIndex = -1;
-        let linesToRemove = [];
-        const bsToCheck = bsArray.map(bs => bs.toLowerCase());
-        
-        // Tìm dòng có CH trùng
-        lines.forEach((line, index) => {
+        // BƯỚC 1: Xóa BS trùng từ các dòng khác (không xóa cả dòng)
+        lines = lines.map(line => {
             const parts = line.split('.');
-            if (parts.length >= 2) {
-                const existingCH = parts[0].toLowerCase();
-                const existingBS = parts[1].split(' ').map(bs => bs.trim().toLowerCase()).filter(bs => bs !== '');
+            if (parts.length >= 2 && parts[0].toLowerCase() !== ch.toLowerCase()) {
+                const existingBS = parts[1].split(' ').map(bs => bs.trim()).filter(bs => bs !== '');
+                const existingMore = parts.slice(2).join('.');
                 
-                // Nếu CH trùng
-                if (existingCH === ch.toLowerCase()) {
-                    existingLineIndex = index;
-                }
+                // Lọc ra các BS không trùng
+                const remainingBS = existingBS.filter(existingBs => 
+                    !bsArray.some(newBs => newBs.toLowerCase() === existingBs.toLowerCase())
+                );
                 
-                // Nếu có BS trùng (khác CH)
-                const hasMatchingBS = existingBS.some(bs => bsToCheck.includes(bs));
-                if (hasMatchingBS && existingCH !== ch.toLowerCase()) {
-                    linesToRemove.push(index);
+                if (remainingBS.length > 0) {
+                    // Còn BS thì giữ dòng
+                    return existingMore ? 
+                        `${parts[0]}.${remainingBS.join(' ')}.${existingMore}` : 
+                        `${parts[0]}.${remainingBS.join(' ')}`;
+                } else {
+                    // Không còn BS thì xóa dòng
+                    return null;
                 }
             }
-        });
+            return line;
+        }).filter(line => line !== null);
         
-        let newEntry = '';
+        // BƯỚC 2: Thêm/gộp dữ liệu mới
+        let existingLineIndex = lines.findIndex(line => 
+            line.split('.')[0].toLowerCase() === ch.toLowerCase()
+        );
         
-        // Xử lý logic gộp dữ liệu
+        let newEntry;
         if (existingLineIndex !== -1) {
-            // Có CH trùng - gộp BS và More
-            const existingLine = lines[existingLineIndex];
-            const parts = existingLine.split('.');
+            // Gộp với dòng có CH trùng
+            const parts = lines[existingLineIndex].split('.');
             const existingBS = parts[1].split(' ').map(bs => bs.trim()).filter(bs => bs !== '');
             const existingMore = parts.slice(2).join('.');
             
-            // Gộp BS (loại bỏ trùng lặp)
             const mergedBS = [...new Set([...existingBS, ...bsArray])];
+            const mergedMore = more && !existingMore.includes(more) ? 
+                (existingMore ? `${existingMore} ${more}` : more) : existingMore;
             
-            // Gộp More (nếu có)
-            let mergedMore = existingMore;
-            if (more && !existingMore.includes(more)) {
-                mergedMore = existingMore ? `${existingMore} ${more}` : more;
-            }
-            
-            newEntry = more ? `${ch}.${mergedBS.join(' ')}.${mergedMore}` : `${ch}.${mergedBS.join(' ')}`;
+            newEntry = mergedMore ? `${ch}.${mergedBS.join(' ')}.${mergedMore}` : `${ch}.${mergedBS.join(' ')}`;
             lines[existingLineIndex] = newEntry;
-            
         } else {
-            // Không có CH trùng - tạo dòng mới
+            // Thêm dòng mới
             newEntry = more ? `${ch}.${bsArray.join(' ')}.${more}` : `${ch}.${bsArray.join(' ')}`;
             lines.push(newEntry);
         }
         
-        // Xóa các dòng có BS trùng (khác CH)
-        if (linesToRemove.length > 0) {
-            lines = lines.filter((line, index) => !linesToRemove.includes(index));
-        }
-        
-        const newContent = lines.join('\n');
-        
         // Cập nhật file
-        await updateFile(newContent, fileInfo.sha);
+        await updateFile(lines.join('\n'), fileInfo.sha);
         
-        let message = '✅ Đã thêm thông tin thành công!';
-        if (existingLineIndex !== -1) {
-            message += ' Đã gộp với dữ liệu CH trùng.';
-        }
-        if (linesToRemove.length > 0) {
-            message += ` Đã xóa ${linesToRemove.length} dòng có BS trùng.`;
-        }
+        showMessage('✅ Đã thêm thông tin thành công! Bạn có thể thêm tiếp.', 'success');
+        clearForm(); // Chỉ xóa form, không refresh trang
         
-        showMessage(message, 'success');
-        clearForm();
-        
-        // Load lại dữ liệu và preview sau 3 giây
+        // Cập nhật dữ liệu nền
         setTimeout(() => {
             loadData();
             loadPreviewData();
-        }, 3000);
+        }, 1500);
         
     } catch (error) {
         console.error('Lỗi khi thêm dữ liệu:', error);
         showMessage('❌ Lỗi: ' + error.message, 'error');
     }
 }
+
 
 // Hàm lấy thông tin file
 async function getFileInfo() {
